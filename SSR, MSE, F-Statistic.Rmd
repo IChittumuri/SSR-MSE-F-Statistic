@@ -1,0 +1,456 @@
+---
+title: "SSR, MSE, F-Statistic "
+author: "Isabella Chittumuri"
+date: "4/12/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Reference http://rstudio-pubs-static.s3.amazonaws.com/5221_47e56f6eaa1248a9ac99f069ce1b4890.html
+# Reference http://www.stat.tugraz.at/courses/files/s07.pdf
+```
+
+```{r}
+setwd("~/Documents/Hunter College/Spring 2021/Stat 707/HW")
+library(tidyverse)
+library(ggplot2)
+```
+
+## 7.1 State the number of degrees of freedom that are associated with each of the following extra sums of squares:
+
+(1) $SSR(X_1|X_2)$ has 1 degree of freedom associated with it
+(2) $SSR(X_2|X_1,X_3)$ has 1 degrees of freedom associated with it
+(3) $SSR(X_1,X_2|X_3,X_4$ has 2 degrees of freedom associated with it
+
+## 7.5 Refer to Patient satisfaction Problem 6.15.
+
+A hospital administrator wished to study the relation between patient satisfaction (Y) and patient's age ($X_1$, in years), severity of illness ($X_2$, an index), and anxiety level ($X_3$, an index). The administrator randomly selected 46 patients and collected the data presented below, where larger values of $Y, X_2, \;\text{and}\; X_3$ are, respectively, associated with more satisfaction, increased severity of illness, and more anxiety.
+
+### (a) 
+Obtain the analysis of variance (ANOVA) table that decomposes the regression sum of squares into extra sums of squares associated with $X_2$; with $X_1$, given $X_2$; and with $X_3$, given $X_2$ and $X_1$.
+
+```{r}
+# import patient satisfaction (PS)
+PS <- read.csv("Patient_Satisfaction.csv", header = F)
+
+# names(PS) <- c("satisfaction", "age", "illness_severity", "anxiety_level")
+names(PS) <- c("Y", "x1", "x2", "x3")
+```
+
+```{r}
+# regression model, have to switch x1 and x2 to obtain anova that decomposes with x2
+fit <- lm(Y ~ x2 + x1 + x3, data = PS)
+summary(fit)
+```
+
+Regression Equation:
+$Y=158.5 - 1.142X_1 - 0.442X_2 - 13.47X_3$
+
+```{r}
+fit.aov <- anova(fit)
+tab <- as.table(cbind(
+  'SS' = c("SSR(x2, x1, x3)" = sum(fit.aov[1:3, 2]),
+         "SSR(x2)"           = fit.aov[1, 2],
+         "SSR(x1|x2)"        = fit.aov[2, 2],
+         "SSR(x3|x2, x1)"    = fit.aov[3, 2],
+         "SSE"               = fit.aov[4, 2],
+         "Total"             = sum(fit.aov[, 2])),
+
+  'Df' = c(                    sum(fit.aov[1:3, 1]),
+                               fit.aov[1, 1],
+                               fit.aov[2, 1],
+                               fit.aov[3, 1],
+                               fit.aov[4, 1],
+                               sum(fit.aov$Df)),
+
+  'MS' = c(                    sum(fit.aov[1:3, 2]) / sum(fit.aov[1:3, 1]),
+                               fit.aov[1, 3],
+                               fit.aov[2, 3],
+                               fit.aov[3, 3],
+                               fit.aov[4, 3],
+                               NA)
+))
+
+round(tab, 2)
+```
+
+The extra sum of squares associated with $X_2$ = 4860.26, with 1 degree of freedom
+The extra sum of squares associated with $X_1|X_2$ = 3896.04, with 1 degree of freedom
+The extra sum of squares associated with $X_3|X_2,X_1$ = 364.16, with 1 degree of freedom
+
+### (b) 
+Test whether $X_3$ can be dropped from the regression model given that $X_1$, and $X_2$ are retained. Use the F* test statistic and level of significance .025. State the alternatives, decision rule, and conclusion. What is the P-value of the test?
+
+Alternatives:
+
+$H_0:B_3 = 0$
+$H_a:B_3 \ne 0$
+
+General Decision Rule
+
+$$
+\begin{aligned}
+& F^* \leq F(1-\alpha, df_R-df_F, df_F), \;\text{fail to reject}\; H_0 \\
+& F^* > F(1-\alpha, df_R-df_F, df_F),  \;\text{reject}\; H_0 
+\end{aligned}
+$$
+
+General F* Test Statistic Formula 
+
+$$
+F^* = \frac{\frac{SSE(R) - SSE(F)}{df_R - df_F}}{\frac{SSE(F)}{df_F}}
+$$
+
+F* test statistic for whether or not $B_3=0$ is a marginal test, given $X_1,X_2$ is in the model
+
+$$
+\begin{aligned}
+& F^* = \frac{\frac{SSR(X_3|X_1,X_2)}{1}}{\frac{SSE(X_1,X_2,X_3)}{n-4}} \\
+& F^*= \frac{MSR(X_3|X_1,X_2)}{MSE(X_1,X_2,X_3)} \\
+& F^*= \frac{\frac{SSR(X_3|X_1,X_2)}{1}}{MSE(X_1,X_2,X_3)} 
+\end{aligned}
+$$
+
+```{r}
+fit.aov
+```
+
+$$
+F^*= \frac{\frac{364.16}{1}}{101.16} = 3.599
+$$
+
+```{r}
+# look at the f distribution  
+# 1-a, df, n-p (46-2)
+qf(1-0.025, 1, 42)
+```
+
+$$
+3.599 \leq 5.404, \;\text{fail to reject}\; H_0
+$$
+
+```{r}
+# another way to test full and reduced model
+f_mod <- lm(Y ~ x2 + x1 + x3, data = PS)
+r_mod <- lm(Y ~ x2 + x1, data = PS)
+anova(r_mod,f_mod, test="Chisq") 
+```
+
+```{r}
+# Get p-value of test
+summary(f_mod)
+```
+
+The p-value of the F is 0.065, which is greater than 0.05 suggesting that we don't need $X_3$.
+In conclusion, based on the F* test statistic and it's p-value, we can omit $X_3$ from the final model fitting.
+
+Note: the p-value of the test is the same as p-value of the tested parameter in summary function.
+
+## 7.14 Refer to Patient satisfaction Problem 6.15
+
+### (a) 
+Calculate $R^2_{Y1}, R^2_{Y1|2}, \;\text{and}\; R^2_{Y1|23}$. How is the degree of marginal linear association between $Y \;\text{and}\; X_1$ affected, when adjusted for $X_2$ ? When adjusted for both $X_2 \;\text{and}\; X_3$?
+
+```{r}
+library(rsq)
+x1 <- lm(Y ~ x1, data=PS)
+rsq.partial(x1)
+
+x2_giv_x1 <- lm(Y ~ x1 + x2, data=PS)
+rsq.partial(x2_giv_x1)
+
+x2x3_giv_x1 <- lm(Y ~ x1 + x2 + x3, data=PS)
+rsq.partial(x2x3_giv_x1)
+```
+
+$$
+\begin{aligned}
+& R^2_{Y1} = 0.6189 \\
+& R^2_{Y1|2} = 0.4578 \\
+& R^2_{Y1|23} = 0.4021
+\end{aligned}
+$$
+
+The degree of marginal linear association between $Y \;\text{and}\;X_1$ decreases by roughly a third when adjusted for $X_2$. It decreases only a little more when adjusted for $X_2 \;\text{and}\; X_3$
+
+### (b)
+Make a similar analysis to that in part (a) for the degree of marginal linear association between $Y \;\text{and}\; X_2$. Are your findings similar to those in part (a) for $Y \;\text{and}\; X_1$?
+
+```{r}
+x2 <- lm(Y ~ x2, data=PS)
+rsq.partial(x2)
+
+x1_giv_x2 <- lm(Y ~ x2 + x1, data=PS)
+rsq.partial(x1_giv_x2)
+
+x3_giv_x2x1 <- lm(Y ~ x2 + x1 + x3, data=PS)
+rsq.partial(x3_giv_x2x1)
+```
+
+$$
+\begin{aligned}
+& R^2_{Y2} = 0.3635 \\
+& R^2_{Y2|1} = 0.094 \\
+& R^2_{Y2|13} = 0.0189
+\end{aligned}
+$$
+
+The degree of marginal linear association between $Y \;\text{and}\;X_2$ decreases roughly to a fourth of its value when adjusted for $X_1$. It decreases to about a fifth of this value when adjusted for $X_1 \;\text{and}\;X_3$. 
+
+My findings are similar to those in part (a), because $R^2$ keeps decreasing when adjusting for more parameters.
+
+## 7.31 The following regression model is being considered in a water resources study:
+$Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \beta_3X_{i1}X_{i2} + \beta_4\sqrt{X_{i3}} + \epsilon_i$
+
+State the reduced models for testing whether or not: 
+
+### (1) 
+$\beta_3 = \beta_4 = 0$
+Reduced model: $Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \epsilon_i$
+
+### (2) 
+$\beta_3 = 0$
+Reduced model: $Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \beta_4\sqrt{X_{i3}} + \epsilon_i$
+
+## 7.37 
+Refer to the CDI data set in Appendix C.2. For predicting the number of active physicians $Y$ in a county, it has been decided to include total population $X_1$ and total personal income $X_2$ as predictor variables. The question now is whether an additional predictor variable would be helpful in the model and, if so, which variable would be most helpful. Assume that a first-order multiple regression model is appropriate.
+
+```{r}
+# import county demographic information (CDI)
+CDI <- read.csv("CDI_Data.csv", header = F)
+
+
+names(CDI) <- c("ID", "county", "state", "land_area", "total_pop", "precent_pop_18_34", "percent_pop_65", "num_physicians", "n_hospital_beds", "total_crimes", "percent_hs_grads", "percent_bach", "percent_pov", "percent_unemploy", "per_capita", "total_income", "geographic_region")
+```
+
+### (a)
+For each of the following variables, calculate the coefficient of partial determination given that $X_1$ and $X_2$ are included in the model: land area $X_3$, percent of population 65 or older $X_4$, number of hospital beds $X_5$, and total serious crimes $X_6$.
+
+```{r}
+x3_mod <- lm(num_physicians ~ total_pop + total_income + land_area, data = CDI)
+
+x4_mod <- lm(num_physicians ~ total_pop + total_income + percent_pop_65, data = CDI)
+
+x5_mod <- lm(num_physicians ~ total_pop + total_income + n_hospital_beds, data = CDI)
+
+x6_mod <- lm(num_physicians ~ total_pop + total_income + total_crimes, data = CDI)
+
+full_mod <- lm(num_physicians ~ total_pop + total_income + land_area + percent_pop_65 + n_hospital_beds + total_crimes, data = CDI)
+
+rsq.partial(x3_mod)
+rsq.partial(x4_mod)
+rsq.partial(x5_mod)
+rsq.partial(x6_mod)
+```
+
+$$
+\begin{aligned}
+& R^2_{Y3|12} = 0.028824 \\
+& R^2_{Y4|12} = 0.003842 \\
+& R^2_{Y5|12} = 0.5538 \\
+& R^2_{Y6|12} = 0.007323
+\end{aligned}
+$$
+
+
+### b
+On the basis of the results in part (a), which of the four additional predictor variables is best? Is the extra sum of squares associated with this variable larger than those for the other three variables?
+
+Based on the results in part (a), number of hospital beds ($X_5$) is the best because it's has the highest coefficient of partial determination.
+
+### c
+Using the F* test statistic, test whether or not the variable determined to be best in part (b) is helpful in the regression model when $X_1$ and $X_2$ are included in the model; use $\alpha=.01$. State the alternatives, decision rule, and conclusion. Would the F* test statistics for the other three potential predictor variables be as large as the one here? Discuss.
+
+Alternatives:
+
+$H_0:B_k = 0$
+$H_a:B_k \ne 0$
+
+General Decision Rule
+
+$$
+\begin{aligned}
+& F^* \leq F(1-\alpha, df_R-df_F, df_F), \;\text{fail to reject}\; H_0\\
+& F^* > F(1-\alpha, df_R-df_F, df_F), \;\text{reject}\; H_0
+\end{aligned}
+$$
+
+F* Test Statistic Formula
+
+$$
+F^*= \frac{\frac{SSR(X_k|X_1,X_2)}{1}}{MSE(X_1,X_2,X_k)}
+$$
+
+```{r}
+anova(x3_mod)
+anova(x4_mod)
+anova(x5_mod)
+anova(x6_mod)
+```
+
+
+$$
+\begin{aligned}
+& \;\text{For}\; X_3 = F^*= \frac{\frac{4063370}{1}}{313999} = 12.94 \\
+& \;\text{For}\; X_4 = F^*= \frac{\frac{541647}{1}}{322077} = 1.68 \\
+& \;\text{For}\; X_5 = F^*= \frac{\frac{78070132}{1}}{144259} = 541.18 \\
+& \;\text{For}\; X_6 = F^*= \frac{\frac{1032359}{1}}{320951} = 3.216
+\end{aligned}
+$$
+
+```{r}
+# look at the f distribution 
+qf(1-0.01, 1, 436)
+```
+
+$$
+\begin{aligned}
+& \;\text{For}\; X_3 = 12.94 > 6.69, \;\text{reject}\; H_0 \\
+& \;\text{For}\; X_4 = 1.68 \leq 6.69, \;\text{fail to reject}\; H_0 \\
+& \;\text{For}\; X_5 = 541.18 > 6.69, \;\text{reject}\; H_0 \\
+& \;\text{For}\; X_6 = 3.216 \leq 6.69, \;\text{fail to reject}\; H_0
+\end{aligned}
+$$
+
+Number of hospital beds ($X_5$), the variable determined to be the best in part (a), is helpful in the regression model when $X_1$ and $X_2$ are included in the model. This is because it's F* test statistic is greater than the alpha level F statistic, therefore we can reject the null $H_0$ that $B_5 = 0$
+
+The other three predictor variables F* test statistic is not as large as that of $X_5$. 
+
+## 8.6
+Steroid level. An endocrinologist was interested in exploring the relationship between the level of a steroid (Y) and age (X) in healthy female subjects whose ages ranged from 8 to 25 years She collected a sample of 27 healthy females in this age range. The data are given below:
+
+```{r}
+steroid <- read.table('Steroid_level.txt')
+names(steroid) <- c("steroid_level", "age")
+```
+
+### a. Fit regression model (8.2). Plot the fitted regression function and the data. Does the quadratic regression function appear to be a good fit here? Find R2.
+
+(8.2)
+
+$$
+Y = \beta_0 + \beta_1x + \beta_2x^2 + \epsilon_i
+$$
+
+```{r}
+# reference on why we do this: lecture 8 slide 8
+
+# centering predictor age
+steroid$center_age <- steroid$age - mean(steroid$age)
+steroid$center_age_sq <- (steroid$center_age)^2
+```
+
+```{r}
+lmod <- lm(steroid_level ~ center_age + center_age_sq, data=steroid)
+summary(lmod)
+```
+
+$$
+Y = 21.0942 + 1.13736x - .118401x^2 + \epsilon_i
+$$
+
+```{r}
+# model fitted values w/ CI
+steroid <- bind_cols(
+  steroid, as.data.frame(predict.lm(lmod, interval = "confidence"))
+) %>% rename(conf_low = lwr, conf_high=upr)
+```
+
+```{r}
+# plot of actual values and CI of fitted 
+ggplot(steroid, aes(x=age, y=steroid_level)) +
+  geom_point() +
+  geom_line(aes(y = fit, color = "fitted line")) +
+  geom_ribbon(aes(ymin= conf_low, ymax = conf_high, fill = "confidence"), alpha = 0.3)
+```
+
+### b. Test whether or not there is a regression relation; use a = .01. State the alternatives, decision rule, and conclusion. What is the P-value of the test?
+
+Alternatives:
+
+$H_0:B_1 = B_{11} = 0$
+$H_a:B_1 = B_{11} \ne 0$
+
+Note: it's $\beta_{11}$ because it is the square value of $\beta_1$
+
+General Decision Rule
+
+$$
+\begin{aligned}
+& F^* \leq F(1-\alpha, df_R-df_F, df_F), \;\text{fail to reject}\; H_0\\
+& F^* > F(1-\alpha, df_R-df_F, df_F), \;\text{reject}\; H_0
+\end{aligned}
+$$
+
+```{r}
+# gives F-statistic, df for partial and full
+summary(lmod)
+```
+
+Note: summary F-stat $24 \;\text{DF} = 27-3 = (n-p)$
+
+```{r}
+# get number of obs
+nrow(steroid)
+```
+
+
+```{r}
+# look at the f distribution 
+# 1-alpha, p-1, n-p
+qf(1-0.01, 2, 24)
+```
+
+$$
+52.63 > 5.613, \;\text{reject}\; H_0
+$$
+
+Therefore, we should keep both age and age squared in the model.
+
+### d. Predict the steroid levels of females aged 15 using a 99 percent prediction interval. Interpret your interval.
+
+```{r}
+# data frame of one value 15
+steroid15 <- data.frame(center_age = 15, center_age_sq = (15)^2)
+```
+
+```{r}
+21.0942 + 1.13736*(15) - .118401*(15)^2
+```
+
+```{r}
+predict.lm(lmod, newdata=steroid15, interval = "prediction", level = 0.99)
+```
+
+### e. Test whether the quadratic term can be dropped from the model; use a = .01. State the alternatives, decision rule, and conclusion.
+
+Alternatives:
+
+$H_0:B_{11} = 0$
+$H_a:B_{11} \ne 0$
+
+General Decision Rule
+$$
+\begin{aligned}
+& F^* \leq F(1-\alpha, df_R-df_F, df_F),\;\text{fail to reject}\; H_0 \\
+& F^* > F(1-\alpha, df_R-df_F, df_F), \;\text{reject}\; H_0
+\end{aligned}
+$$
+
+```{r}
+# gives F-value, df for partial and full
+anova(lmod)
+```
+
+```{r}
+# look at the f distribution 
+# 1-alpha, df of partial determination, df of whole model
+qf(1-0.01, 1, 24)
+```
+
+$$
+25.453 >  7.822871, \;\text{reject}\; H_0
+$$
+
+Therefore, we should keep quadratic term in the model.
